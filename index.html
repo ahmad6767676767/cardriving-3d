@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Car Parking Simulator - Made by Ahmad Bin Shifa</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, sans-serif; user-select: none; }
+        
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-white">
+
+    <!-- HUD OVERLAY -->
+    <div id="hud" class="hidden absolute inset-0 pointer-events-none z-10 flex flex-col justify-between p-6">
+        
+        <!-- Top Navigation Bar -->
+        <div class="flex justify-between items-start">
+            <!-- Branding -->
+            <div class="glass-panel p-3.5 rounded-2xl shadow-xl flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-tr from-amber-500 to-red-600 rounded-xl flex items-center justify-center text-xl shadow-lg shadow-amber-500/20">
+                    🏎️
+                </div>
+                <div>
+                    <h1 class="text-xs font-black text-amber-400 tracking-wider uppercase">PARKING PRO 3D</h1>
+                    <p class="text-[11px] text-slate-300">Made by <span class="text-teal-300 font-bold">Ahmad Bin Shifa</span></p>
+                </div>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="flex gap-3">
+                <div class="glass-panel px-4 py-2 rounded-2xl text-center">
+                    <p class="text-[10px] uppercase font-bold text-slate-400">Level</p>
+                    <p id="levelText" class="text-lg font-black text-amber-400">1 / 3</p>
+                </div>
+                <div class="glass-panel px-4 py-2 rounded-2xl text-center">
+                    <p class="text-[10px] uppercase font-bold text-slate-400">Collisions</p>
+                    <p id="collisionsText" class="text-lg font-black text-rose-500">0</p>
+                </div>
+                <div class="glass-panel px-4 py-2 rounded-2xl text-center">
+                    <p class="text-[10px] uppercase font-bold text-slate-400">Alignment</p>
+                    <p id="alignText" class="text-lg font-black text-emerald-400">0%</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Notification Badge -->
+        <div id="statusBadge" class="self-center bg-amber-500/90 text-slate-950 font-black px-6 py-2 rounded-full text-xs uppercase tracking-widest shadow-2xl transition-all opacity-0">
+            Park Inside the Green Zone!
+        </div>
+
+        <!-- Bottom Controls & Dashboard Bar -->
+        <div class="flex justify-between items-end">
+            <!-- Controls Legend -->
+            <div class="glass-panel p-4 rounded-2xl shadow-xl text-xs space-y-1 text-slate-300">
+                <p class="font-bold text-amber-400 mb-1">🕹️ Controls:</p>
+                <div class="grid grid-cols-2 gap-x-4 gap-y-1">
+                    <div><kbd class="bg-slate-800 border border-slate-600 px-1.5 py-0.5 rounded text-[10px]">W / ↑</kbd> Gas</div>
+                    <div><kbd class="bg-slate-800 border border-slate-600 px-1.5 py-0.5 rounded text-[10px]">S / ↓</kbd> Brake / Rev</div>
+                    <div><kbd class="bg-slate-800 border border-slate-600 px-1.5 py-0.5 rounded text-[10px]">A / D</kbd> Steer</div>
+                    <div><kbd class="bg-slate-800 border border-slate-600 px-1.5 py-0.5 rounded text-[10px]">SPACE</kbd> Handbrake</div>
+                    <div><kbd class="bg-slate-800 border border-slate-600 px-1.5 py-0.5 rounded text-[10px]">C</kbd> Camera View</div>
+                    <div><kbd class="bg-slate-800 border border-slate-600 px-1.5 py-0.5 rounded text-[10px]">R</kbd> Reset Car</div>
+                </div>
+            </div>
+
+            <!-- Dashboard Speedometer -->
+            <div class="glass-panel p-5 rounded-3xl shadow-xl text-center min-w-[140px]">
+                <p id="speedometer" class="text-4xl font-black text-white italic tracking-tighter">0</p>
+                <p class="text-[10px] font-bold text-amber-400 tracking-widest uppercase mt-0.5">KM / H</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- START & LEVEL SUCCESS MODAL OVERLAY -->
+    <div id="menuScreen" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md z-30 flex items-center justify-center p-4">
+        <div class="glass-panel max-w-md w-full rounded-3xl p-8 shadow-2xl text-center relative overflow-hidden">
+            
+            <div class="w-16 h-16 bg-gradient-to-tr from-amber-500 to-red-600 rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-xl shadow-amber-500/30 mb-4">
+                🚗
+            </div>
+
+            <h1 id="menuTitle" class="text-2xl font-black text-white mb-1 tracking-tight">3D CAR PARKING SIMULATOR</h1>
+            <p class="text-xs font-bold text-amber-400 mb-6">Made by Ahmad Bin Shifa</p>
+
+            <p id="menuDesc" class="text-xs text-slate-300 mb-6 leading-relaxed">
+                Drive carefully into the highlighted green parking spot without hitting barriers or traffic cones. Stay completely stopped inside the spot to complete the level.
+            </p>
+
+            <button id="actionButton" onclick="startGame()" class="w-full bg-gradient-to-r from-amber-500 to-red-600 hover:from-amber-400 hover:to-red-500 text-slate-950 font-black py-4 rounded-2xl shadow-xl shadow-amber-500/25 transition-all text-xs uppercase tracking-widest">
+                Start Parking Game
+            </button>
+        </div>
+    </div>
+
+    <!-- THREE.JS & GAME ENGINE CODE -->
+    <script type="module">
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+        // --- Sound Engine (Web Audio API) ---
+        const AudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playImpactSound() {
+            if (AudioCtx.state === 'suspended') AudioCtx.resume();
+            const osc = AudioCtx.createOscillator();
+            const gain = AudioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(120, AudioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(20, AudioCtx.currentTime + 0.15);
+            gain.gain.setValueAtTime(0.3, AudioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, AudioCtx.currentTime + 0.15);
+            osc.connect(gain);
+            gain.connect(AudioCtx.destination);
+            osc.start();
+            osc.stop(AudioCtx.currentTime + 0.15);
+        }
+
+        function playSuccessSound() {
+            if (AudioCtx.state === 'suspended') AudioCtx.resume();
+            const now = AudioCtx.currentTime;
+            [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+                const osc = AudioCtx.createOscillator();
+                const gain = AudioCtx.createGain();
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.1, now + idx * 0.08);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.2);
+                osc.connect(gain);
+                gain.connect(AudioCtx.destination);
+                osc.start(now + idx * 0.08);
+                osc.stop(now + idx * 0.08 + 0.2);
+            });
+        }
+
+        // --- Game Setup ---
+        let currentLevel = 1;
+        let collisions = 0;
+        let isGameActive = false;
+        let parkTimer = 0;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f172a);
+        scene.fog = new THREE.FogExp2(0x0f172a, 0.012);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // --- Lighting ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfef08a, 1.2);
+        sunLight.position.set(40, 60, 20);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 0.5;
+        sunLight.shadow.camera.far = 200;
+        const d = 50;
+        sunLight.shadow.camera.left = -d;
+        sunLight.shadow.camera.right = d;
+        sunLight.shadow.camera.top = d;
+        sunLight.shadow.camera.bottom = -d;
+        scene.add(sunLight);
+
+        // --- Environment Construction ---
+        const groundGeo = new THREE.PlaneGeometry(160, 160);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Grid Lines
+        const grid = new THREE.GridHelper(160, 40, 0xf59e0b, 0x334155);
+        grid.position.y = 0.01;
+        scene.add(grid);
+
+        // --- Procedural Car Mesh Construction ---
+        const carGroup = new THREE.Group();
+
+        // Chassis
+        const bodyGeo = new THREE.BoxGeometry(2.1, 0.7, 4.4);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.2, metalness: 0.5 });
+        const carBody = new THREE.Mesh(bodyGeo, bodyMat);
+        carBody.position.y = 0.6;
+        carBody.castShadow = true;
+        carGroup.add(carBody);
+
+        // Cabin Top
+        const cabinGeo = new THREE.BoxGeometry(1.8, 0.6, 2.2);
+        const cabinMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.1, metalness: 0.9 });
+        const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+        cabin.position.set(0, 1.25, -0.2);
+        cabin.castShadow = true;
+        carGroup.add(cabin);
+
+        // Wheels Setup
+        const wheelGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.35, 24);
+        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
+        
+        const wheels = [];
+        const wheelPositions = [
+            [-1.1, 0.4, 1.4],  // Front Left
+            [1.1, 0.4, 1.4],   // Front Right
+            [-1.1, 0.4, -1.4], // Rear Left
+            [1.1, 0.4, -1.4]   // Rear Right
+        ];
+
+        wheelPositions.forEach((pos, idx) => {
+            const wheelHolder = new THREE.Group();
+            wheelHolder.position.set(...pos);
+
+            const wheelMesh = new THREE.Mesh(wheelGeo, wheelMat);
+            wheelMesh.rotation.z = Math.PI / 2;
+            wheelMesh.castShadow = true;
+            wheelHolder.add(wheelMesh);
+
+            carGroup.add(wheelHolder);
+            wheels.push(wheelHolder);
+        });
+
+        scene.add(carGroup);
+
+        // --- Parking Zone Target Setup ---
+        const targetGroup = new THREE.Group();
+        
+        const targetGeo = new THREE.PlaneGeometry(2.6, 5.0);
+        const targetMat = new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.4, side: THREE.DoubleSide });
+        const targetMesh = new THREE.Mesh(targetGeo, targetMat);
+        targetMesh.rotation.x = -Math.PI / 2;
+        targetMesh.position.y = 0.02;
+        targetGroup.add(targetMesh);
+
+        // Glowing boundary box
+        const targetBoxGeo = new THREE.BoxGeometry(2.8, 0.1, 5.2);
+        const targetBoxMat = new THREE.MeshBasicMaterial({ color: 0x34d399, wireframe: true });
+        const targetBox = new THREE.Mesh(targetBoxGeo, targetBoxMat);
+        targetBox.position.y = 0.05;
+        targetGroup.add(targetBox);
+
+        scene.add(targetGroup);
+
+        // --- Obstacles Array & Spawner ---
+        const obstacles = [];
+
+        function clearObstacles() {
+            obstacles.forEach(obj => scene.remove(obj));
+            obstacles.length = 0;
+        }
+
+        function spawnCone(x, z) {
+            const coneGeo = new THREE.ConeGeometry(0.35, 0.9, 12);
+            const coneMat = new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.4 });
+            const cone = new THREE.Mesh(coneGeo, coneMat);
+            cone.position.set(x, 0.45, z);
+            cone.castShadow = true;
+            scene.add(cone);
+            obstacles.push(cone);
+        }
+
+        function spawnBarrier(x, z, rotY = 0) {
+            const barGeo = new THREE.BoxGeometry(3.5, 0.9, 0.6);
+            const barMat = new THREE.MeshStandardMaterial({ color: 0xe11d48, roughness: 0.5 });
+            const barrier = new THREE.Mesh(barGeo, barMat);
+            barrier.position.set(x, 0.45, z);
+            barrier.rotation.y = rotY;
+            barrier.castShadow = true;
+            scene.add(barrier);
+            obstacles.push(barrier);
+        }
+
+        // --- Level Definitions ---
+        const levels = [
+            {
+                // Level 1: Straight forward parking
+                carStart: { x: 0, z: 20, rot: 0 },
+                targetPos: { x: 0, z: -15, rot: 0 },
+                setup: () => {
+                    spawnCone(-2, -12); spawnCone(2, -12);
+                    spawnCone(-2, -18); spawnCone(2, -18);
+                }
+            },
+            {
+                // Level 2: Reverse parking with side obstacles
+                carStart: { x: -15, z: 15, rot: Math.PI / 4 },
+                targetPos: { x: 15, z: -10, rot: Math.PI / 2 },
+                setup: () => {
+                    spawnBarrier(10, -10, Math.PI / 2);
+                    spawnBarrier(20, -10, Math.PI / 2);
+                    spawnCone(15, -7); spawnCone(15, -13);
+                }
+            },
+            {
+                // Level 3: Tight parallel parking challenge
+                carStart: { x: 0, z: 25, rot: 0 },
+                targetPos: { x: 10, z: 0, rot: 0 },
+                setup: () => {
+                    spawnBarrier(10, 5, 0);   // Front parked vehicle/barrier
+                    spawnBarrier(10, -5, 0);  // Rear parked vehicle/barrier
+                    spawnCone(7, 0); spawnCone(13, 0);
+                }
+            }
+        ];
+
+        function loadLevel(lvlIdx) {
+            clearObstacles();
+            const lvl = levels[lvlIdx - 1];
+            
+            carGroup.position.set(lvl.carStart.x, 0, lvl.carStart.z);
+            carGroup.rotation.y = lvl.carStart.rot;
+            
+            targetGroup.position.set(lvl.targetPos.x, 0, lvl.targetPos.z);
+            targetGroup.rotation.y = lvl.targetPos.rot;
+
+            lvl.setup();
+
+            speed = 0;
+            steeringAngle = 0;
+            collisions = 0;
+            parkTimer = 0;
+
+            document.getElementById('levelText').textContent = `${lvlIdx} / ${levels.length}`;
+            document.getElementById('collisionsText').textContent = collisions;
+        }
+
+        // --- Vehicle Dynamics & Physics Controls ---
+        const keys = { forward: false, backward: false, left: false, right: false, brake: false };
+        let speed = 0;
+        let steeringAngle = 0;
+        const maxSpeed = 0.35;
+        const reverseMax = -0.15;
+        const acceleration = 0.008;
+        const friction = 0.96;
+        const steeringSpeed = 0.04;
+        const maxSteerAngle = 0.5;
+
+        let cameraMode = 0; // 0: Chase, 1: Top-down, 2: Driver Hood
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.forward = true;
+            if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.backward = true;
+            if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
+            if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = true;
+            if (e.code === 'Space') keys.brake = true;
+            if (e.code === 'KeyC') cameraMode = (cameraMode + 1) % 3;
+            if (e.code === 'KeyR') resetCarPosition();
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.forward = false;
+            if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.backward = false;
+            if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
+            if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
+            if (e.code === 'Space') keys.brake = false;
+        });
+
+        function resetCarPosition() {
+            const lvl = levels[currentLevel - 1];
+            carGroup.position.set(lvl.carStart.x, 0, lvl.carStart.z);
+            carGroup.rotation.y = lvl.carStart.rot;
+            speed = 0;
+            steeringAngle = 0;
+        }
+
+        // Global function attached to Start Button
+        window.startGame = function() {
+            document.getElementById('menuScreen').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+            isGameActive = true;
+            loadLevel(currentLevel);
+        };
+
+        // --- Animation & Physics Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (isGameActive) {
+                // Steering Dynamics
+                if (keys.left) steeringAngle = Math.min(steeringAngle + steeringSpeed, maxSteerAngle);
+                else if (keys.right) steeringAngle = Math.max(steeringAngle - steeringSpeed, -maxSteerAngle);
+                else steeringAngle *= 0.8; // Auto center wheels
+
+                // Front Wheel Rotation visuals
+                wheels[0].rotation.y = steeringAngle;
+                wheels[1].rotation.y = steeringAngle;
+
+                // Acceleration & Braking Dynamics
+                if (keys.forward) speed = Math.min(speed + acceleration, maxSpeed);
+                else if (keys.backward) speed = Math.max(speed - acceleration, reverseMax);
+                else speed *= friction;
+
+                if (keys.brake) speed *= 0.85;
+
+                // Update Car Position & Heading
+                if (Math.abs(speed) > 0.001) {
+                    carGroup.rotation.y += steeringAngle * (speed / maxSpeed) * 0.08;
+                    carGroup.translateZ(speed);
+
+                    // Roll wheels
+                    wheels.forEach(w => w.children[0].rotation.x += speed * 2);
+                } else {
+                    speed = 0;
+                }
+
+                // Speedometer UI update
+                const kmh = Math.round(Math.abs(speed) * 180);
+                document.getElementById('speedometer').textContent = kmh;
+
+                // --- Collision Checking ---
+                const carBox = new THREE.Box3().setFromObject(carBody);
+                obstacles.forEach(obs => {
+                    const obsBox = new THREE.Box3().setFromObject(obs);
+                    if (carBox.intersectsBox(obsBox)) {
+                        playImpactSound();
+                        collisions++;
+                        document.getElementById('collisionsText').textContent = collisions;
+                        
+                        // Bounce back slightly
+                        speed = -speed * 0.6;
+                        carGroup.translateZ(speed * 2);
+                    }
+                });
+
+                // --- Parking Detection Accuracy Logic ---
+                const distToTarget = carGroup.position.distanceTo(targetGroup.position);
+                
+                // Rotation angle difference check
+                let angleDiff = Math.abs(carGroup.rotation.y - targetGroup.rotation.y) % Math.PI;
+                if (angleDiff > Math.PI / 2) angleDiff = Math.PI - angleDiff;
+
+                const maxDistance = 5.0;
+                let alignScore = Math.max(0, 100 - (distToTarget / maxDistance * 70 + angleDiff * 30));
+                alignScore = Math.round(alignScore);
+                document.getElementById('alignText').textContent = `${alignScore}%`;
+
+                // Checking if perfectly parked inside spot
+                const statusBadge = document.getElementById('statusBadge');
+                if (distToTarget < 1.2 && angleDiff < 0.25) {
+                    if (Math.abs(speed) < 0.02) {
+                        parkTimer += 1;
+                        statusBadge.style.opacity = '1';
+                        statusBadge.textContent = `HOLD POSITION... ${Math.ceil((120 - parkTimer) / 40)}s`;
+
+                        if (parkTimer >= 120) { // Stay stopped for ~3 seconds
+                            playSuccessSound();
+                            isGameActive = false;
+                            
+                            if (currentLevel < levels.length) {
+                                currentLevel++;
+                                document.getElementById('menuTitle').textContent = "LEVEL COMPLETED!";
+                                document.getElementById('menuDesc').textContent = `Great job! You parked with ${collisions} collisions. Prepare for Level ${currentLevel}.`;
+                                document.getElementById('actionButton').textContent = `Start Level ${currentLevel}`;
+                            } else {
+                                currentLevel = 1;
+                                document.getElementById('menuTitle').textContent = "ALL LEVELS PASSED!";
+                                document.getElementById('menuDesc').textContent = "Master Driver Status Achieved! You completed all parking challenges created by Ahmad Bin Shifa.";
+                                document.getElementById('actionButton').textContent = "Play Again";
+                            }
+                            
+                            document.getElementById('menuScreen').classList.remove('hidden');
+                            document.getElementById('hud').classList.add('hidden');
+                        }
+                    }
+                } else {
+                    parkTimer = 0;
+                    statusBadge.style.opacity = '0';
+                }
+
+                // --- Camera Follow Modes ---
+                if (cameraMode === 0) {
+                    // Chase Camera
+                    const relativeCameraOffset = new THREE.Vector3(0, 4, -9);
+                    const cameraOffset = relativeCameraOffset.applyMatrix4(carGroup.matrixWorld);
+                    camera.position.lerp(cameraOffset, 0.1);
+                    camera.lookAt(carGroup.position.clone().add(new THREE.Vector3(0, 1, 0)));
+                } else if (cameraMode === 1) {
+                    // Top-down Tactical Cam
+                    camera.position.set(carGroup.position.x, 30, carGroup.position.z);
+                    camera.lookAt(carGroup.position);
+                } else if (cameraMode === 2) {
+                    // Hood / Driver Cam
+                    const hoodOffset = new THREE.Vector3(0, 1.3, 0.5).applyMatrix4(carGroup.matrixWorld);
+                    camera.position.copy(hoodOffset);
+                    const targetLook = new THREE.Vector3(0, 1.2, 10).applyMatrix4(carGroup.matrixWorld);
+                    camera.lookAt(targetLook);
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Window Resizing
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
